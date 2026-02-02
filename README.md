@@ -7,7 +7,7 @@
 <p>专业兼容：支持导出 .fountain 格式文件，可无缝对接其它专业编剧软件继续深度编辑。<br>
 <p>中文优化：为简体中文用户打造，意图解决常见剧本软件的中文输入痛点。<br>
 <p>开箱即用：安装了Windows的电脑无需安装环境，使用EDGE浏览器打开“NotepadScriptWritter(Alpha).html”即可运行。
-<p>如果您无法打开html文件，这里是已经封装好的独立.exe文件。下载后打开即可使用。
+<p>如果您无法打开html文件，这里是已经封装好的独立.exe文件(https://pan.baidu.com/s/1t4QGrKx_1KsZEbP-S0WEvw?pwd=y869) 。下载后解压打开即可使用。
 <h2>如何使用🚀 </h2>
 <p>下载软件。
 <p>双击运行程序。
