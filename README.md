@@ -1,4 +1,4 @@
-# 🎬 Notepad Script Writter (Alpha) or Screenplay Writer Pro (Alpha)
+# 🎬 Notepad Script Writer (Alpha) or Screenplay Writer Pro (Alpha)
 一款简单到打开就能直接开始创作的剧本编辑器。
 <p>不需要学习复杂的排版规则，不需要操心格式设置。专注于你的故事，剩下的交给软件。<br>
 <h2>✨ 核心亮点</h2>
