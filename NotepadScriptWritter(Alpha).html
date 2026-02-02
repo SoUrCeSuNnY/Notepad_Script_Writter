@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Screenplay Writer Pro</title>
+    <style>
+        /* --- 1. 核心变量系统 --- */
+        :root {
+            --bg-app: #f3f4f6;
+            --bg-panel: #ffffff;
+            --text-main: #111827;
+            --text-dim: #9ca3af;
+            --border: #e5e7eb;
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --danger: #ef4444; /* 删除按钮颜色 */
+            --paper-bg: #ffffff;
+            --paper-text: #000000;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            
+            --page-width: 8.5in;
+            --page-min-height: 11in;
+            --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            --font-script: 'Courier New', Courier, monospace;
+        }
+
+        [data-theme="dark"] {
+            --bg-app: #111827;
+            --bg-panel: #1f2937;
+            --text-main: #f9fafb;
+            --text-dim: #6b7280;
+            --border: #374151;
+            --primary: #60a5fa;
+            --primary-hover: #3b82f6;
+            --paper-bg: #27272a;
+            --paper-text: #e5e7eb;
+            --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+        }
+
+        /* --- 2. 基础布局 --- */
+        body {
+            background-color: var(--bg-app);
+            color: var(--text-main);
+            font-family: var(--font-ui);
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        header {
+            background: var(--bg-panel);
+            border-bottom: 1px solid var(--border);
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            box-shadow: var(--shadow);
+            z-index: 50;
+        }
+
+        /* 顶部模式提示条 */
+        #mode-toast {
+            position: fixed;
+            top: 75px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: var(--text-main);
+            color: var(--bg-panel);
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        #mode-toast.show { opacity: 1; }
+
+        /* 标签页与工具栏 */
+        .tabs { display: flex; gap: 8px; height: 100%; align-items: flex-end; }
+        .tab-btn {
+            background: transparent; border: none; border-bottom: 3px solid transparent;
+            color: var(--text-dim); padding: 0 16px; height: 100%; cursor: pointer;
+            font-weight: 600; font-size: 0.9rem; transition: all 0.2s;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .tab-btn svg { width: 18px; height: 18px; fill: currentColor; }
+        .tab-btn:hover { color: var(--primary); background: rgba(0,0,0,0.03); }
+        .tab-btn.active { border-bottom-color: var(--primary); color: var(--primary); }
+
+        .toolbar { display: flex; gap: 10px; align-items: center; }
+        .btn {
+            background: transparent; border: 1px solid var(--border); color: var(--text-main);
+            padding: 6px 12px; border-radius: 6px; cursor: pointer;
+            display: inline-flex; align-items: center; gap: 6px;
+            font-size: 0.85rem; height: 38px; transition: all 0.2s; font-weight: 500;
+        }
+        .btn svg { width: 18px; height: 18px; fill: currentColor; }
+        .btn:hover { border-color: var(--primary); color: var(--primary); }
+        .btn-primary { background: var(--primary); color: white; border: none; }
+        .btn-primary:hover { background: var(--primary-hover); color: white; }
+        /* 危险操作按钮 (删除) */
+        .btn-danger:hover { border-color: var(--danger); color: var(--danger); }
+
+        .dropdown { position: relative; }
+        .dropdown-menu {
+            position: absolute; right: 0; top: 110%; background: var(--bg-panel);
+            border: 1px solid var(--border); border-radius: 6px;
+            box-shadow: 0 10px 15px rgba(0,0,0,0.1); min-width: 200px;
+            display: none; flex-direction: column; z-index: 100; padding: 4px 0;
+        }
+        .dropdown-menu.show { display: flex; }
+        .dropdown-item {
+            padding: 10px 16px; text-align: left; background: none; border: none;
+            color: var(--text-main); cursor: pointer; display: flex; align-items: center; gap: 10px; font-size: 0.9rem;
+        }
+        .dropdown-item svg { width: 18px; height: 18px; fill: currentColor; opacity: 0.7; }
+        .dropdown-item:hover { background: rgba(128,128,128,0.1); }
+        .divider { height: 1px; background: var(--border); margin: 4px 0; }
+
+        /* --- 3. 编辑工作区 --- */
+        #workspace {
+            flex: 1;
+            overflow-y: auto;
+            padding: 40px 0 100px 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .tab-content { display: none; width: 100%; flex-direction: column; align-items: center; gap: 30px; }
+        .tab-content.active { display: flex; }
+
+        .paper {
+            background: var(--paper-bg); color: var(--paper-text);
+            width: var(--page-width); min-height: var(--page-min-height);
+            padding: 1in; box-sizing: border-box; box-shadow: var(--shadow);
+            font-family: var(--font-script); font-size: 12pt; line-height: 1.2;
+            white-space: pre-wrap; outline: none;
+        }
+
+        /* 封面页样式 - 已更新排版 */
+        #title-page { text-align: center; display: flex; flex-direction: column; justify-content: center; position: relative; }
+        .tp-center { margin-top: 25%; }
+        
+        .tp-field:empty::before {
+            content: attr(data-placeholder);
+            color: var(--text-dim);
+            opacity: 0.6;
+        }
+        @media print { .tp-field:empty::before { content: none; } }
+
+        .tp-title { font-size: 2rem; font-weight: bold; text-decoration: underline; text-transform: uppercase; margin-bottom: 2rem; }
+        /* 紧凑排版：Credit 和 Author 之间距离很小 */
+        .tp-credit { margin-bottom: 0.2rem; font-size: 1.1rem; } 
+        .tp-author { margin-bottom: 4rem; font-size: 1.2rem; }
+        .tp-contact { position: absolute; bottom: 1in; left: 1in; text-align: left; opacity: 0.8; font-size: 0.95rem; }
+
+        /* 剧本元素类 */
+        .s-slug { font-weight: bold; text-transform: uppercase; margin-top: 1.5em; margin-bottom: 1em; color: var(--paper-text); }
+        .s-action { margin-bottom: 1em; text-align: left; }
+        .s-char { margin-top: 1em; margin-left: 38%; width: 40%; text-transform: uppercase; }
+        .s-paren { margin-left: 31%; width: 30%; }
+        .s-dial { margin-left: 25%; width: 50%; margin-bottom: 1em; }
+        .s-trans { text-align: right; text-transform: uppercase; margin-bottom: 1em; }
+        
+        [data-theme="dark"] .s-slug { color: #fcd34d; }
+
+        /* 浮动元素 */
+        #fab-help {
+            position: fixed; bottom: 25px; right: 25px;
+            width: 48px; height: 48px; border-radius: 50%;
+            background: var(--bg-panel); border: 1px solid var(--border); color: var(--text-main);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: flex; align-items: center; justify-content: center;
+            cursor: pointer; z-index: 90; transition: all 0.2s;
+        }
+        #fab-help:hover { background: var(--primary); color: white; border-color: var(--primary); transform: translateY(-2px); }
+        #fab-help svg { width: 24px; height: 24px; fill: currentColor; }
+
+        #help-tooltip {
+            position: fixed; bottom: 85px; right: 25px;
+            background: var(--bg-panel); color: var(--text-main); border: 1px solid var(--border);
+            padding: 15px; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+            width: 250px; display: none; z-index: 89;
+        }
+        .key-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.85rem; }
+        .key-badge { background: #eee; color: #333; padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 0.8rem; }
+
+        /* 模态框 */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); z-index: 200;
+            display: none; align-items: center; justify-content: center;
+        }
+        .modal {
+            background: var(--bg-panel); padding: 25px; border-radius: 12px; width: 480px; max-height: 80vh;
+            display: flex; flex-direction: column; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+        }
+        .snapshot-list { overflow-y: auto; flex: 1; margin: 15px 0; border: 1px solid var(--border); border-radius: 6px; }
+        .snapshot-item { padding: 12px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .snapshot-item:last-child { border-bottom: none; }
+        
+        /* 按钮组 */
+        .btn-group { display: flex; gap: 8px; }
+
+        /* 打印样式 */
+        @media print {
+            body { background: white; height: auto; display: block; overflow: visible; }
+            header, #fab-help, #help-tooltip, .modal-overlay, #mode-toast { display: none !important; }
+            .tab-content { display: none !important; }
+            .tab-content.active { display: flex !important; }
+            #workspace { padding: 0; display: block; }
+            .paper { margin: 0; padding: 0; width: 100%; box-shadow: none; border: none; background: white !important; color: black !important; min-height: auto; page-break-after: always; }
+            .s-slug { color: black !important; }
+            @page { margin: 1in; size: letter; }
+            #title-page { height: 9in; page-break-after: always; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 顶部模式提示条 -->
+    <div id="mode-toast">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+        <span id="toast-text">模式: 动作</span>
+    </div>
+
+    <!-- 导航 -->
+    <header>
+        <div class="tabs">
+            <button class="tab-btn active" onclick="TabManager.switch('script')">
+                <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg> 
+                剧本正文
+            </button>
+            <button class="tab-btn" onclick="TabManager.switch('synopsis')">
+                <svg viewBox="0 0 24 24"><path d="M18 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 4h5v8l-2.5-1.5L6 12V4z"/></svg> 
+                故事梗概
+            </button>
+            <button class="tab-btn" onclick="TabManager.switch('bios')">
+                <svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg> 
+                人物小传
+            </button>
+        </div>
+
+        <div class="toolbar">
+            <button class="btn" onclick="ThemeManager.toggle()" title="切换主题">
+                <svg viewBox="0 0 24 24"><path d="M20 15.31L23.31 12 20 8.69V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69zM12 18V6c3.31 0 6 2.69 6 6s-2.69 6-6 6z"/></svg>
+            </button>
+            <div class="dropdown">
+                <button class="btn" onclick="Menu.toggle()">
+                    <svg viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
+                    菜单
+                </button>
+                <div class="dropdown-menu" id="main-menu">
+                    <div id="menu-version-control">
+                        <button class="dropdown-item" onclick="VersionControl.open()">
+                            <svg viewBox="0 0 24 24"><path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg> 
+                            版本快照
+                        </button>
+                        <div class="divider"></div>
+                        <label class="dropdown-item">
+                            <svg viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></svg> 
+                            导入 .fountain
+                            <input type="file" hidden accept=".fountain,.txt" onchange="FileManager.import(this)">
+                        </label>
+                    </div>
+                    <button class="dropdown-item" onclick="FileManager.export()">
+                        <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg> 
+                        导出文件
+                    </button>
+                    <button class="dropdown-item" onclick="window.print()">
+                        <svg viewBox="0 0 24 24"><path d="M19 8h-1V3H6v5H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zM8 5h8v3H8V5zm8 12v4H8v-4h8zm2-2v-2H6v2H4v-4c0-.55.45-1 1-1h14c.55 0 1 .45 1 1v4h-2z"/></svg> 
+                        打印 / PDF
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div id="workspace">
+        <div id="tab-script" class="tab-content active">
+            <!-- 封面页 -->
+            <div id="title-page" class="paper" contenteditable="true" spellcheck="false">
+                <div class="tp-center">
+                    <div class="tp-title tp-field" data-placeholder="剧本标题 (点击输入)">无题剧本</div>
+                    <div class="tp-credit tp-field" data-placeholder="作者">作者</div>
+                    <div class="tp-author tp-field" data-placeholder="作者姓名">作者姓名</div>
+                </div>
+                <div class="tp-contact tp-field" data-placeholder="联系方式&#10;Email: ...&#10;Phone: ...">联系方式</div>
+            </div>
+            <div id="script-editor" class="paper" contenteditable="true" spellcheck="false">
+                <div class="s-slug">INT. 场景标题 - 时间</div>
+                <div class="s-action">在这里开始写作... 使用 Tab 键切换格式。</div>
+            </div>
+        </div>
+        
+        <div id="tab-synopsis" class="tab-content">
+            <div id="synopsis-editor" class="paper" contenteditable="true" spellcheck="false">
+                <div style="text-align: center; font-weight: bold; font-size: 1.5em; margin-bottom: 20px;">故事梗概</div>
+                <div>在此撰写故事大纲...</div>
+            </div>
+        </div>
+        
+        <div id="tab-bios" class="tab-content">
+            <div id="bios-editor" class="paper" contenteditable="true" spellcheck="false">
+                <div style="text-align: center; font-weight: bold; font-size: 1.5em; margin-bottom: 20px;">人物小传</div>
+                <div style="font-weight: bold;">角色名：</div>
+                <div>背景故事...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 快捷键 FAB -->
+    <div id="fab-help" onclick="Help.toggle()" title="快捷键帮助">
+        <svg viewBox="0 0 24 24"><path d="M11 18h2v-2h-2v2zm1-16C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-2.21 0-4 1.79-4 4h2c0-1.1.9-2 2-2s2 .9 2 2c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5 0-2.21-1.79-4-4-4z"/></svg>
+    </div>
+    <div id="help-tooltip">
+        <div class="key-row"><span>切换格式</span><span class="key-badge">Tab</span></div>
+        <div class="key-row"><span>智能换行</span><span class="key-badge">Enter</span></div>
+        <div class="key-row"><span>保存文件</span><span class="key-badge">Ctrl+S</span></div>
+        <div style="border-top:1px solid var(--border); margin:8px 0;"></div>
+        <div style="font-size:0.75rem; color:var(--text-dim);">Tab 循环: 场景 -> 动作 -> 角色 -> 对白</div>
+    </div>
+
+    <!-- 弹窗 -->
+    <div id="modal-version" class="modal-overlay" onclick="if(event.target===this) this.style.display='none'">
+        <div class="modal">
+            <div style="font-size:1.1rem; font-weight:bold; border-bottom:1px solid var(--border); padding-bottom:15px; display:flex; align-items:center; gap:10px;">
+                <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>
+                版本管理
+            </div>
+            <div id="snapshot-list" class="snapshot-list"></div>
+            <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:10px;">
+                <button class="btn" onclick="document.getElementById('modal-version').style.display='none'">
+                    <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+                    关闭
+                </button>
+                <button class="btn btn-primary" onclick="VersionControl.save()">
+                    <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                    新建快照
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const State = { activeTab: 'script', theme: localStorage.getItem('theme') || 'light' };
+
+        const Toast = {
+            timer: null,
+            show: (text) => {
+                const el = document.getElementById('mode-toast');
+                document.getElementById('toast-text').innerText = text;
+                el.classList.add('show');
+                clearTimeout(Toast.timer);
+                Toast.timer = setTimeout(() => el.classList.remove('show'), 2000);
+            }
+        };
+
+        const TabManager = {
+            switch: (tabId) => {
+                State.activeTab = tabId;
+                document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.toggle('active', btn.onclick.toString().includes(tabId)));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.toggle('active', c.id === `tab-${tabId}`));
+                const scriptMenu = document.getElementById('menu-version-control');
+                if (scriptMenu) scriptMenu.style.display = (tabId === 'script') ? 'block' : 'none';
+            }
+        };
+
+        const Editor = {
+            types: [
+                { cls: 's-slug', label: '场景标题 (SCENE)' },
+                { cls: 's-action', label: '动作 (ACTION)' },
+                { cls: 's-char', label: '角色 (CHARACTER)' },
+                { cls: 's-dial', label: '对白 (DIALOGUE)' },
+                { cls: 's-paren', label: '备注 (PARENTHETICAL)' },
+                { cls: 's-trans', label: '转场 (TRANSITION)' }
+            ],
+            init: () => {
+                const editor = document.getElementById('script-editor');
+                editor.addEventListener('keydown', Editor.handleKey);
+                editor.addEventListener('input', Editor.handleInput);
+            },
+            getBlock: () => {
+                const sel = window.getSelection();
+                if (!sel.rangeCount) return null;
+                let node = sel.anchorNode;
+                while (node && node.id !== 'workspace') {
+                    if (node.tagName === 'DIV' && node.parentElement && node.parentElement.id === 'script-editor') return node;
+                    node = node.parentElement;
+                }
+                return null;
+            },
+            handleKey: (e) => {
+                const block = Editor.getBlock();
+                if (!block) return;
+                if (e.key === 'Tab') {
+                    e.preventDefault();
+                    Editor.cycleType(block);
+                } else if (e.key === 'Enter') {
+                    e.preventDefault();
+                    Editor.handleEnter(block);
+                }
+            },
+            handleInput: () => {
+                const block = Editor.getBlock();
+                if (block && !block.classList.contains('s-slug')) {
+                    const text = block.innerText.toUpperCase();
+                    if (text.startsWith('INT.') || text.startsWith('EXT.') || text.startsWith('I/E')) {
+                        block.className = 's-slug';
+                        Toast.show('场景标题');
+                    }
+                }
+            },
+            cycleType: (block) => {
+                const current = Editor.types.find(t => block.classList.contains(t.cls));
+                const idx = current ? Editor.types.indexOf(current) : 1;
+                const next = Editor.types[(idx + 1) % Editor.types.length];
+                block.className = next.cls;
+                Toast.show(next.label);
+            },
+            handleEnter: (block) => {
+                let next = Editor.types[1]; // Action
+                if (block.classList.contains('s-slug')) next = Editor.types[1]; 
+                else if (block.classList.contains('s-char') || block.classList.contains('s-paren')) next = Editor.types[3]; // Dialogue
+                else if (block.classList.contains('s-trans')) next = Editor.types[0]; // Slug
+                else if (block.classList.contains('s-dial')) {
+                    next = block.innerText.trim() ? Editor.types[2] : Editor.types[1]; 
+                    if (next.cls === 's-action' && !block.innerText.trim()) {
+                        block.className = 's-action'; 
+                        Toast.show('动作');
+                        return;
+                    }
+                }
+                const newDiv = document.createElement('div');
+                newDiv.className = next.cls;
+                newDiv.innerHTML = '<br>';
+                block.after(newDiv);
+                const range = document.createRange();
+                range.setStart(newDiv, 0);
+                range.collapse(true);
+                const sel = window.getSelection();
+                sel.removeAllRanges();
+                sel.addRange(range);
+                newDiv.scrollIntoView({ behavior: "smooth", block: "center" });
+                Toast.show(next.label);
+            }
+        };
+
+        const FileManager = {
+            export: () => {
+                let content = "", filename = "draft";
+                if (State.activeTab === 'script') {
+                    const title = document.querySelector('.tp-title').innerText.trim() || "Untitled";
+                    const author = document.querySelector('.tp-author').innerText.trim();
+                    content = `Title: ${title}\nAuthor: ${author}\n\n`;
+                    document.getElementById('script-editor').childNodes.forEach(node => {
+                        if (node.nodeType !== 1) return;
+                        const t = node.innerText.trim();
+                        if (!t) return;
+                        if (node.classList.contains('s-slug') || node.classList.contains('s-char')) content += `\n${t.toUpperCase()}\n`;
+                        else if (node.classList.contains('s-trans')) content += `\n${t.toUpperCase()} TO:\n`;
+                        else if (node.classList.contains('s-dial') || node.classList.contains('s-paren')) content += `${t}\n`;
+                        else content += `\n${t}\n`;
+                    });
+                    filename = title;
+                } else {
+                    const elId = State.activeTab === 'synopsis' ? 'synopsis-editor' : 'bios-editor';
+                    content = document.getElementById(elId).innerText;
+                    filename = State.activeTab;
+                }
+                const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+                const a = document.createElement("a");
+                a.href = URL.createObjectURL(blob);
+                a.download = `${filename}.fountain`;
+                a.click();
+            },
+            import: (input) => {
+                const file = input.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const text = e.target.result;
+                    const editor = document.getElementById('script-editor');
+                    editor.innerHTML = "";
+                    const lines = text.replace(/\r/g, '').split('\n');
+                    let inHeader = true;
+                    lines.forEach(line => {
+                        line = line.trim();
+                        if (!line) return;
+                        if (inHeader && line.includes(':')) return;
+                        inHeader = false;
+                        const div = document.createElement('div');
+                        if (line.startsWith('INT') || line.startsWith('EXT')) div.className = 's-slug';
+                        else if (line === line.toUpperCase() && !line.includes(':')) div.className = 's-char';
+                        else div.className = 's-action';
+                        div.innerText = line;
+                        editor.appendChild(div);
+                    });
+                    TabManager.switch('script');
+                    input.value = '';
+                };
+                reader.readAsText(file);
+            }
+        };
+
+        const VersionControl = {
+            key: 'sp_snapshots_final',
+            save: () => {
+                const snapshots = JSON.parse(localStorage.getItem(VersionControl.key) || '[]');
+                snapshots.unshift({
+                    id: Date.now(),
+                    date: new Date().toLocaleString(),
+                    title: document.querySelector('.tp-title').innerText,
+                    htmlTitle: document.getElementById('title-page').innerHTML,
+                    htmlBody: document.getElementById('script-editor').innerHTML
+                });
+                if (snapshots.length > 10) snapshots.pop();
+                localStorage.setItem(VersionControl.key, JSON.stringify(snapshots));
+                VersionControl.renderList();
+            },
+            restore: (id) => {
+                if (!confirm("确定恢复吗？当前内容将丢失。")) return;
+                const snapshots = JSON.parse(localStorage.getItem(VersionControl.key) || '[]');
+                const target = snapshots.find(s => s.id === id);
+                if (target) {
+                    document.getElementById('title-page').innerHTML = target.htmlTitle;
+                    document.getElementById('script-editor').innerHTML = target.htmlBody;
+                    document.getElementById('modal-version').style.display = 'none';
+                }
+            },
+            delete: (id) => {
+                if(!confirm("确定删除此快照吗？")) return;
+                let snapshots = JSON.parse(localStorage.getItem(VersionControl.key) || '[]');
+                snapshots = snapshots.filter(s => s.id !== id);
+                localStorage.setItem(VersionControl.key, JSON.stringify(snapshots));
+                VersionControl.renderList();
+            },
+            renderList: () => {
+                const snapshots = JSON.parse(localStorage.getItem(VersionControl.key) || '[]');
+                const container = document.getElementById('snapshot-list');
+                container.innerHTML = snapshots.length ? '' : '<div style="color:var(--text-dim);text-align:center;padding:20px;">无快照</div>';
+                snapshots.forEach(s => {
+                    const div = document.createElement('div');
+                    div.className = 'snapshot-item';
+                    div.innerHTML = `
+                        <div>${s.title}<br><small>${s.date}</small></div>
+                        <div class="btn-group">
+                            <button class="btn" onclick="VersionControl.restore(${s.id})" title="恢复">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/></svg>
+                            </button>
+                            <button class="btn btn-danger" onclick="VersionControl.delete(${s.id})" title="删除">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+                            </button>
+                        </div>`;
+                    container.appendChild(div);
+                });
+            },
+            open: () => {
+                VersionControl.renderList();
+                document.getElementById('modal-version').style.display = 'flex';
+            }
+        };
+
+        const ThemeManager = {
+            toggle: () => {
+                const newTheme = State.theme === 'light' ? 'dark' : 'light';
+                document.documentElement.setAttribute('data-theme', newTheme);
+                localStorage.setItem('theme', newTheme);
+                State.theme = newTheme;
+            }
+        };
+
+        const Menu = {
+            toggle: () => {
+                const menu = document.getElementById('main-menu');
+                menu.classList.toggle('show');
+                const closeFn = (e) => { if (!e.target.closest('.dropdown')) { menu.classList.remove('show'); document.removeEventListener('click', closeFn); }};
+                setTimeout(() => document.addEventListener('click', closeFn), 0);
+            }
+        };
+
+        const Help = { toggle: () => { const tip = document.getElementById('help-tooltip'); tip.style.display = tip.style.display === 'block' ? 'none' : 'block'; }};
+
+        document.addEventListener('DOMContentLoaded', () => {
+            document.documentElement.setAttribute('data-theme', State.theme);
+            Editor.init();
+            document.addEventListener('keydown', (e) => { if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); FileManager.export(); }});
+        });
+    </script>
+</body>
+</html>
